@@ -61,7 +61,7 @@ Proiectul se va încheia cu o **analiză comparativă**, sub forma unui articol 
 - diferențele între implementarea fără design patterns și cea cu design patterns  
 - analiza unor metrici de performanță, claritate și scalabilitate  
 
-Printre metricii analizați se pot regăsi:  
+Printre metricele analizați se pot regăsi:  
 - Timpul de execuție  
 - Complexitatea codului  
 - Ușurința extinderii sistemului  
