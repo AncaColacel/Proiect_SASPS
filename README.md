@@ -9,6 +9,7 @@
 - **COLĂCEL Anca-Maria** — SSA1-A  
 - **ZECHERU Andreea-Corina** — EGOV2  
 - **FUIOREA Florina-Daniela** — EGOV2  
+- **TOEA Valentin Daniel** — EGOV2
 
 ---
 
@@ -54,6 +55,30 @@ Implementarea va fi realizată în **Python**, folosind următoarele librării �
 - **Markdown** — pentru generarea rapoartelor lizibile, cu sinteza principalelor știri, entități, subiecte și linkuri către surse  
 
 ---
+
+### 🤝 Împărțire taskuri
+1.	Colectează articolele din sursele selectate - **Zecheru Andreea-Corina** 
+2.	Procesează textele (normalizare, curățare) - **Zecheru Andreea-Corina + Toea Valentin Daniel**
+3.	Extrage entități, cuvinte-cheie și subiecte principale - **Fuiorea Florina-Daniela + Toea Valentin Daniel**
+4.	Analizează tonul și sentimentele articolelor - **Fuiorea Florina-Daniela**
+5.	Generează rapoarte în format Markdown - **Colăcel Anca-Maria**
+6.	Testare și validare rapoarte finale - **Colăcel Anca-Maria**
+7.	Implementare variantă cu design patterns - **Zecheru + Fuiorea + Colăcel + Toea**
+8.	Realizare comparații + articol final - **Zecheru + Fuiorea + Colăcel + Toea**
+
+---
+
+## 📌 Sprint-uri și versiuni
+
+| **Sprint** | **Obiectiv principal** | **Ce se face** | **Rezultat** |
+|-----------|-------------------------|-----------------|---------------|
+| **Sprint 1** | Documentație proiect | - Întocmire documentație<br>- Configurare repo pentru proiect | Mediu de lucru propice pentru începerea proiectului |
+| **Sprint 2** | Implementare variantă simplă | - Pipeline fără design patterns<br>- Salvare JSON + normalizare text + extragere topicuri și entități | Fișiere în format JSON cu informații despre știrile colectate |
+| **Sprint 3** | Implementare variantă finală, fără design patterns | - Adăugare surse noi de știri<br>- Analiză pe ton și sentiment<br>- Generare rapoarte finale<br>- Testare sistem | Rapoarte finale în format Markdown despre principalele știri apărute într-o anumită perioadă |
+| **Sprint 4** | Implementare cu design patterns + comparații | - Refactorizare pipeline folosind Strategy, Factory, Builder, Chain of Responsibility, Template Method<br>- Comparații între variante | Varianta finală cu design patterns și rapoarte comparative |
+
+---
+
 
 ### 📊 Etapa finală: Analiza comparativă
 
