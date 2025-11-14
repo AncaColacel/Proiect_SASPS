@@ -56,8 +56,17 @@ def parse_listing(html: str):
         url = a_tag["href"]
         title = a_tag.get_text(strip=True)
 
+        category_tag = article_div.find('div', class_='hn-category-tag')
+        tags = []
+        if category_tag:
+            supratitlu_tag = category_tag.find('span', class_='supratitlu')
+            if supratitlu_tag:
+                tags.append(supratitlu_tag.get_text(strip=True))
+
         try:
-            article = newspaper.article(url)
+            article = newspaper.Article(url)
+            article.download()
+            article.parse()
         except Exception as e:
             print(f"[WARN] Eroare la {url}: {e}")
             continue
@@ -67,7 +76,8 @@ def parse_listing(html: str):
             "title": article.title or title,
             "url": url,
             "date": article.publish_date.date().isoformat() if article.publish_date else None,
-            "content": article.text or ""
+            "content": article.text or "",
+            "tags": tags
         })
 
         time.sleep(1)

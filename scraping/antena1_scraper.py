@@ -54,7 +54,23 @@ def parse_listing(html: str):
         title = title_tag.get_text(strip=True)
 
         try:
-            article = newspaper.article(url)
+            article_response = requests.get(url)
+            article_html = article_response.text
+            article_soup = BeautifulSoup(article_html, "html.parser")
+
+            tags_list = []
+            tags_ul = article_soup.find('ul', class_='taguri')
+            if tags_ul:
+                tags_li = tags_ul.find_all('li')
+                for tag in tags_li:
+                    tag_a = tag.find('a')
+                    if tag_a:
+                        tags_list.append(tag_a.get_text(strip=True))
+
+            article = newspaper.Article(url)
+            article.download(input_html=article_html)
+            article.parse()
+
         except Exception as e:
             print(f"[WARN] Eroare la {url}: {e}")
             continue
@@ -64,7 +80,8 @@ def parse_listing(html: str):
             "title": article.title or title,
             "url": url,
             "date": article.publish_date.date().isoformat() if article.publish_date else None,
-            "content": article.text or ""
+            "content": article.text or "",
+            "tags": tags_list
         })
 
         time.sleep(1)

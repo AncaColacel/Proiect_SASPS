@@ -55,7 +55,19 @@ def parse_listing(html: str):
 
         # aici intram direct pe articol, dand click pe link
         try:
-            article = newspaper.article(url)
+            article_page = requests.get(url, timeout=10)
+            article_page.raise_for_status()
+            article_soup = BeautifulSoup(article_page.text, "html.parser")
+
+            article = newspaper.Article(url)
+            article.download(input_html=article_page.text)
+            article.parse()
+            
+            tags = []
+            tags_container = article_soup.find('div', class_='single__tags')
+            if tags_container:
+                tags = [a.get_text(strip=True) for a in tags_container.find_all('a')]
+
         except Exception as e:
             print(f"[WARN] Eroare la {url}: {e}")
             continue
@@ -65,7 +77,8 @@ def parse_listing(html: str):
             "title": article.title or title,
             "url": url,
             "date": article.publish_date.date().isoformat() if article.publish_date else None,
-            "content": article.text or ""
+            "content": article.text or "",
+            "tags": tags
         })
 
         time.sleep(1)

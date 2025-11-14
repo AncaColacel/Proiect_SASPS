@@ -6,6 +6,9 @@ import json
 import time
 import newspaper
 
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36'
+}
 BASE_URL = "https://www.digi24.ro/"
 LISTING_URL = f"{BASE_URL}/ultimele-stiri"
 
@@ -20,7 +23,7 @@ def fetch_listing_page(page: int = 1) -> str:
     else:
         url = f"{LISTING_URL}?p={page}"
 
-    response = requests.get(url)
+    response = requests.get(url, headers=HEADERS)
     return response.text
 
 def parse_listing(html: str):
@@ -55,7 +58,23 @@ def parse_listing(html: str):
 
         # aici intram direct pe articol, dand click pe link
         try:
-            article = newspaper.article(url)
+            article_response = requests.get(url, headers=HEADERS)
+            article_html = article_response.text
+            article_soup = BeautifulSoup(article_html, "html.parser")
+
+            tags_list = []
+            tags_ul = article_soup.find('ul', class_='tags-list')
+            if tags_ul:
+                tags_li = tags_ul.find_all('li', class_='tags-list-item')
+                for tag in tags_li:
+                    tag_a = tag.find('a')
+                    if tag_a:
+                        tags_list.append(tag_a.get_text(strip=True))
+
+            article = newspaper.Article(url)
+            article.download(input_html=article_html)
+            article.parse()
+
         except Exception as e:
             print(f"[WARN] Eroare la {url}: {e}")
             continue
@@ -65,7 +84,8 @@ def parse_listing(html: str):
             "title": article.title or title,
             "url": url,
             "date": article.publish_date.date().isoformat() if article.publish_date else None,
-            "content": article.text or ""
+            "content": article.text or "",
+            "tags": tags_list
         })
 
         time.sleep(1)
