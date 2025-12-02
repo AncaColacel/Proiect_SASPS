@@ -100,9 +100,9 @@ def collect_antena1_stiri(max_pages: int = 1):
     }
 
 if __name__ == "__main__":
-    data = collect_antena1_stiri(max_pages=4)
+    data = collect_antena1_stiri(max_pages=1)
 
-    with open("antena1_stiri_list.json", "w", encoding="utf-8") as f:
+    with open("../jsons/final/baza_date_antena.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print(f"✅ Am salvat {len(data['articles'])} articole în antena1_stiri_list.json")
+    print(f"✅ Am salvat {len(data['articles'])} articole în baza_date.json")

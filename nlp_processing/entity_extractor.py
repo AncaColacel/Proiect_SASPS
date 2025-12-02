@@ -5,7 +5,7 @@ import roner
 ner = roner.NER(named_persons_only=True)
 
 # Încarcă fișierul JSON cu articole
-with open("../jsons/baza_date_with_topics.json", "r", encoding="utf-8") as f:
+with open("../jsons/final/baza_date_final.json", "r", encoding="utf-8") as f:
     data = json.load(f)
 
 # Iterează prin fiecare sursă și fiecare articol
@@ -59,11 +59,11 @@ for source in data:
             entities[tag] = sorted(list(set(entities[tag])))
 
         # Adăugăm noul câmp în articol
-        print(f"Procesat articol: {article.get('title', 'Fără titlu')} - Entități găsite: {entities}")
+        print(f"Procesat articol: {article.get('title', 'Fără titlu')}")
         article["entities"] = entities
 
 # Salvăm rezultatul într-un nou fișier JSON
-with open("../jsons/baza_date_with_topics_with_entities.json", "w", encoding="utf-8") as f:
+with open("../jsons/final/baza_date_final_with_entities.json", "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
 
 print("Entitățile au fost adăugate, duplicatele eliminate și fișierul a fost salvat ca 'baza_date_with_topics_with_entities.json'.")
