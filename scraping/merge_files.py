@@ -1,7 +1,7 @@
 import json
 import os
 
-folder = "../jsons/topics/"  
+folder = "../jsons/final/"  
 
 combined = []
 
@@ -13,8 +13,8 @@ for filename in os.listdir(folder):
             data = json.load(f)
             combined.append(data)   # păstrează TOT fișierul, metadate + articole
 
-with open("../jsons/baza_date_with_topics.json", "w", encoding="utf-8") as out:
+with open("../jsons/baza_date_final.json", "w", encoding="utf-8") as out:
     json.dump(combined, out, ensure_ascii=False, indent=2)
 
-print("✔️ Fișierele au fost unite în baza_date_with_topics.json păstrând metadatele.")
-    
+print("✔️ Fișierele au fost unite în baza_date_final.json păstrând metadatele.")
+        
