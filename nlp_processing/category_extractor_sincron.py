@@ -1,15 +1,13 @@
 import json
 import time
+import os
 from datetime import datetime
-import numpy as np
 from sentence_transformers import SentenceTransformer, util
 
-# --- 1. PRE-ÎNCĂRCARE ---
-print("⏳ Loading model pe CPU...")
-# Forțăm rularea pe procesor
+# --- 1. CONFIGURARE MODEL ---
+print("⏳ [Sincron] Loading model pe CPU...")
 model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device="cpu")
 
-# Definițiile Categoriilor
 CATEGORIES = {
     "POLITIC": "politică guvern parlament alegeri ministru lege partid primar consiliu local democrație candidat administrație",
     "SPORT": "sport fotbal liga campionat meci jucător gol tenis handbal baschet antrenor scor echipă trofeu competiție",
@@ -21,42 +19,67 @@ CATEGORIES = {
 
 cat_names = list(CATEGORIES.keys())
 cat_texts = list(CATEGORIES.values())
-# Vectorizăm categoriile (se întâmplă rapid, o singură dată)
 cat_embeddings = model.encode(cat_texts, convert_to_tensor=True)
 
-# Încărcăm datele brute
-INPUT_FILE = "jsons/final/baza_date_final_nlp.json"
-try:
-    with open(INPUT_FILE, "r", encoding="utf-8") as f:
-        RAW_DATA = json.load(f)
-        if isinstance(RAW_DATA, dict): RAW_DATA = [RAW_DATA]
-except:
-    RAW_DATA = []
+# --- 2. ÎNCĂRCARE DATE ROBUSTĂ ---
+# Aflăm calea folderului PROIECT (urcăm 2 nivele: din nlp_processing -> PROIECT)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# --- 2. FUNCȚIA CARE BLOCHEAZĂ SERVERUL (Sincronă) ---
+# Calea către fișierul JSON. 
+# ATENȚIE: Verifică dacă la tine e "BAZA_DATE_FINALA.json" sau "BAZA_DATE.json"
+INPUT_FILE = os.path.join(BASE_DIR, "jsons", "final", "BAZA_DATE_FINALA.json") 
+
+# Fallback: dacă nu găsește FINALA, caută varianta simplă
+if not os.path.exists(INPUT_FILE):
+    INPUT_FILE = os.path.join(BASE_DIR, "jsons", "final", "BAZA_DATE.json")
+
+RAW_DATA = []
+if os.path.exists(INPUT_FILE):
+    try:
+        with open(INPUT_FILE, "r", encoding="utf-8") as f:
+            RAW_DATA = json.load(f)
+            if isinstance(RAW_DATA, dict): RAW_DATA = [RAW_DATA]
+        print(f"✅ [Sincron] Baza de date încărcată: {len(RAW_DATA)} surse din {os.path.basename(INPUT_FILE)}")
+    except Exception as e:
+        print(f"❌ [Sincron] Eroare citire JSON: {e}")
+else:
+    print(f"⚠️ [Sincron] EROARE CRITICĂ: Nu găsesc fișierul la calea: {INPUT_FILE}")
+
+# --- 3. FUNCȚIA APELATĂ DE SERVER ---
 def classify_on_demand(start_date_str, end_date_str):
-    print(f"⚡ [CPU] Cerere primită: {start_date_str} - {end_date_str}")
+    print(f"⚡ [CPU] Procesare Sincronă: {start_date_str} - {end_date_str}")
     
-    # A. Parsare și Filtrare
+    # Template-ul care previne erorile în server
+    response_template = {
+        "count": 0,
+        "processing_time": 0,
+        "stats": {k: 0 for k in cat_names},
+        "articles": [] # Serverul are nevoie de lista asta, chiar dacă e goală!
+    }
+
     try:
         s_date = datetime.strptime(start_date_str, "%Y-%m-%d")
         e_date = datetime.strptime(end_date_str, "%Y-%m-%d")
     except:
-        return {"error": "Format dată invalid"}
+        print("❌ Format dată invalid")
+        return {**response_template, "error": "Format dată invalid"}
 
     articles_to_process = []
     texts_to_encode = []
     
-    # Căutăm articolele în JSON-ul brut
+    # Filtrare
     for source in RAW_DATA:
-        for art in source.get("articles", []):
+        lista_articole = source.get("articles", []) if isinstance(source, dict) else []
+        for art in lista_articole:
             d_str = art.get("date")
             if not d_str: continue
             try:
-                d_art = datetime.strptime(d_str.split("T")[0], "%Y-%m-%d")
+                d_clean = d_str.split("T")[0]
+                d_art = datetime.strptime(d_clean, "%Y-%m-%d")
+                
                 if s_date <= d_art <= e_date:
                     title = art.get("title", "")
-                    content = art.get("content", "")[:300] 
+                    content = art.get("content", "")[:300]
                     text = f"{title} {content}".strip()
                     
                     if len(text) > 10:
@@ -66,34 +89,31 @@ def classify_on_demand(start_date_str, end_date_str):
             except: continue
 
     if not articles_to_process:
-        return {"message": "Niciun articol găsit."}
+        print(f"⚠️ Nu am găsit articole între {start_date_str} și {end_date_str}.")
+        # Returnăm structura goală, NU un mesaj de eroare simplu
+        return response_template 
 
-    # =================================================================
-    # B. VECTORIZARE PE CPU
-    # Aici serverul va munci din greu. Pe CPU, asta e lent.
-    # =================================================================
+    # Vectorizare
     print(f"🔥 [CPU] Încep vectorizarea a {len(texts_to_encode)} articole...")
     start_t = time.time()
     
-    # encode() rulează implicit pe CPU dacă modelul a fost inițializat așa
-    article_embeddings = model.encode(texts_to_encode, convert_to_tensor=True)
-    
-    # Calcul Similaritate
-    cosine_scores = util.cos_sim(article_embeddings, cat_embeddings)
-    
-    # Extragem rezultatele (Tensor -> Numpy -> Int)
-    best_cat_indices = cosine_scores.argmax(dim=1).numpy()
+    try:
+        article_embeddings = model.encode(texts_to_encode, convert_to_tensor=True)
+        cosine_scores = util.cos_sim(article_embeddings, cat_embeddings)
+        best_cat_indices = cosine_scores.argmax(dim=1).numpy()
+    except Exception as e:
+        print(f"❌ Eroare NLP: {e}")
+        return {**response_template, "error": str(e)}
 
     duration = time.time() - start_t
-    print(f"⏱️ Gata în {duration:.2f} secunde.")
+    print(f"⏱️ Gata în {duration:.2f}s")
 
-    # C. Construim răspunsul
     stats = {cat: 0 for cat in cat_names}
-    
     for i, art in enumerate(articles_to_process):
         cat_idx = best_cat_indices[i]
         category = cat_names[cat_idx]
         art["category"] = category
+        if "sentiment" not in art: art["sentiment"] = {"label": "neutral"}
         stats[category] += 1
 
     return {
@@ -102,11 +122,3 @@ def classify_on_demand(start_date_str, end_date_str):
         "stats": stats,
         "articles": articles_to_process
     }
-
-
-# --- 3. TEST LOCAL ---
-if __name__ == "__main__":
-    s = datetime(2025, 10, 1)
-    e = datetime(2025, 10, 5)
-    classify_on_demand(s.strftime("%Y-%m-%d"), e.strftime("%Y-%m-%d"))
-    

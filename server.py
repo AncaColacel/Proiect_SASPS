@@ -6,6 +6,7 @@ import os
 import sys
 import psutil
 import csv
+import traceback
 from datetime import datetime
 
 # --- IMPORTURI DIN PROIECT ---
@@ -62,28 +63,60 @@ def endpoint_sincron():
     req_data = request.json
     start_str = req_data.get('start_date')
     end_str = req_data.get('end_date')
-    print(f"🐌 [V1] Cerere Sincronă: {start_str} -> {end_str}")
+    print(f"\n🐌 [START] Cerere Sincronă: {start_str} -> {end_str}")
 
     try:
+        # STEP 1: Clasificare
+        print("🔍 [DEBUG 1] Apelez classify_on_demand...")
         result_data = classify_on_demand(start_str, end_str)
         
-        if "error" in result_data: return jsonify(result_data), 400
+        # Verificăm ce am primit (FOARTE IMPORTANT)
+        print(f"📦 [DEBUG 2] Tip date primite: {type(result_data)}")
+        if isinstance(result_data, dict):
+            print(f"🔑 [DEBUG 2] Chei primite: {list(result_data.keys())}")
+        else:
+            print(f"❌ [DEBUG 2] ATENȚIE: result_data NU este dicționar! Este: {result_data}")
+
+        if "error" in result_data: 
+            print(f"⚠️ [DEBUG 3] Primit eroare din classifier: {result_data['error']}")
+            return jsonify(result_data), 400
         
         count = result_data.get('count', 0)
+        print(f"📊 [DEBUG 3] Count articole: {count}")
+
         if count == 0:
+            print("Empty result, returning early.")
             cpu_usage = proc.cpu_percent(interval=None)
             log_metrics("Sincron (V1)", time.time() - start_time, cpu_usage)
             return jsonify({"status": "empty", "report": "Nu au fost găsite articole."})
 
+        # STEP 2: Scriere fișier temp
+        # Verificăm dacă cheia 'articles' există înainte să o accesăm
+        if 'articles' not in result_data:
+            raise KeyError("Cheia 'articles' lipsește din result_data! Verifică category_extractor_sincron.py")
+
+        print(f"💾 [DEBUG 4] Scriu în fișier temporar: {FILE_TEMP_SINCRON}")
         temp_structure = {"source": "Sincron", "articles": result_data['articles']}
+        
         with open(FILE_TEMP_SINCRON, "w", encoding="utf-8") as f:
             json.dump(temp_structure, f, ensure_ascii=False)
+        print("✅ [DEBUG 4] Scriere reușită.")
 
+        # STEP 3: Report Engine
+        print("⚙️ [DEBUG 5] Inițializez ReportEngine...")
         s_date = datetime.strptime(start_str, "%Y-%m-%d")
         e_date = datetime.strptime(end_str, "%Y-%m-%d")
         engine = ReportEngine(s_date, e_date)
+        
+        print(f"📂 [DEBUG 6] Încarc date în Engine din: {FILE_TEMP_SINCRON}")
         engine.load_data(FILE_TEMP_SINCRON)
+        
+        # Verificăm dacă engine-ul a încărcat ceva
+        print(f"📈 [DEBUG 7] Stats Engine după încărcare: {engine.stats}")
+
+        print("📝 [DEBUG 8] Generez Markdown...")
         markdown_report = engine.generate_curated_markdown() 
+        print("✅ [DEBUG 9] Markdown generat.")
         
         duration = time.time() - start_time
         
@@ -99,7 +132,10 @@ def endpoint_sincron():
         })
 
     except Exception as e:
-        print(f"Eroare V1: {e}")
+        print("\n❌ ❌ ❌ EROARE CRITICĂ ÎN ENDPOINT ❌ ❌ ❌")
+        print(f"Mesaj eroare: {str(e)}")
+        print("Traceback complet (Aici vezi linia exactă):")
+        traceback.print_exc() # Asta îți arată exact linia cu problema
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/v2/asincron', methods=['POST'])

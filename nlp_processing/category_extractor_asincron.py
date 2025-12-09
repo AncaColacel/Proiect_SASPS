@@ -21,7 +21,7 @@ cat_texts = list(CATEGORIES.values())
 print("🧮 Encoding categories...")
 cat_embeddings = model.encode(cat_texts, convert_to_tensor=True)
 
-INPUT_FILE = "input.json" # Pune calea ta corectă
+INPUT_FILE = "../jsons/final/BAZA_DATE_FINALA.json" 
 OUTPUT_FILE = "output_classified.json"
 
 # 2. Încărcare Date
