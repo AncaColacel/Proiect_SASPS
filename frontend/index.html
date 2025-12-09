@@ -281,8 +281,11 @@
                     document.getElementById('res-count').innerText = data.articles_count || "N/A";
                     
                     const typeElem = document.getElementById('res-type');
-                    typeElem.innerText = data.type.includes('sincron') ? "Sincron" : "Asincron";
+                    // Verificăm dacă este fix "sincron". Dacă nu, e asincron.
+                    typeElem.innerText = data.type === 'sincron' ? "Sincron" : "Asincron";
 
+                    // Opțional: Poți colora textul ca să fie și mai clar
+                    typeElem.style.color = data.type === 'sincron' ? "#dc2626" : "#16a34a";
                     // Save raw for download
                     currentMarkdownContent = data.report;
 
