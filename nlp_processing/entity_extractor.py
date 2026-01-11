@@ -1,69 +1,45 @@
+import os
 import json
-import roner
+from ner_strategies.context import NERProcessor
 
-# Inițializează modelul RoNER cu named_persons_only pentru a include doar nume proprii
-ner = roner.NER(named_persons_only=True)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
-# Încarcă fișierul JSON cu articole
-with open("../jsons/final/baza_date_final.json", "r", encoding="utf-8") as f:
+INPUT_FILE = os.path.join(DATA_DIR, "baza_date_final.json")
+OUTPUT_FILE = os.path.join(DATA_DIR, "baza_date_final_with_entities.json")
+
+# Inițializează procesorul NER cu strategia dorită ("regex" sau "transformer")
+ner_processor = NERProcessor(strategy_type="regex")  # Schimbă în "transformer" dacă vrei AI
+
+with open(INPUT_FILE, "r", encoding="utf-8") as f:
     data = json.load(f)
 
-# Iterează prin fiecare sursă și fiecare articol
-for source in data:
-    for article in source.get("articles", []):
-        content_text = article.get("content", "")
-        
-        # Rulează NER pe conținut
-        ner_output = ner([content_text])[0]  # RoNER returnează o listă, luăm primul element
-        
-        # Grupăm entitățile, combinând multi-word entities
-        entities = {}
-        current_entity = None
-        current_tag = None
-        
-        for word_info in ner_output["words"]:
-            tag = word_info["tag"]
-            text = word_info["text"]
-            
-            if tag == "O":
-                # dacă eram pe o entitate multi-word, salvăm ce am strâns
-                if current_entity:
-                    if current_tag not in entities:
-                        entities[current_tag] = []
-                    entities[current_tag].append(current_entity)
-                    current_entity = None
-                    current_tag = None
-                continue
 
-            if word_info.get("multi_word_entity", False):
-                # Continuăm entitatea curentă
-                current_entity += " " + text
-            else:
-                # Dacă avem o entitate curentă, o salvăm
-                if current_entity:
-                    if current_tag not in entities:
-                        entities[current_tag] = []
-                    entities[current_tag].append(current_entity)
-                # Începem o nouă entitate
-                current_entity = text
-                current_tag = tag
+# Suportă atât listă plată de articole, cât și listă de surse cu 'articles'
+all_articles = []
+if isinstance(data, list):
+    # Detectăm dacă e deja o listă plată de articole
+    if data and isinstance(data[0], dict) and "content" in data[0]:
+        for article in data:
+            content_text = article.get("content", "")
+            entities = ner_processor.process_text(content_text) if content_text else []
+            article["entities"] = entities
+            all_articles.append(article)
+            print(f"Procesat articol: {article.get('title', 'Fără titlu')}")
+    else:
+        # Presupunem structură de surse cu 'articles'
+        for source in data:
+            for article in source.get("articles", []):
+                content_text = article.get("content", "")
+                entities = ner_processor.process_text(content_text) if content_text else []
+                article["entities"] = entities
+                all_articles.append(article)
+                print(f"Procesat articol: {article.get('title', 'Fără titlu')}")
+else:
+    print("❌ Format necunoscut pentru baza de date. Nu s-au procesat articole.")
 
-        # La final, salvăm ultima entitate dacă există
-        if current_entity:
-            if current_tag not in entities:
-                entities[current_tag] = []
-            entities[current_tag].append(current_entity)
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    json.dump(all_articles, f, ensure_ascii=False, indent=2)
 
-        # Eliminăm duplicatele și sortăm
-        for tag in entities:
-            entities[tag] = sorted(list(set(entities[tag])))
-
-        # Adăugăm noul câmp în articol
-        print(f"Procesat articol: {article.get('title', 'Fără titlu')}")
-        article["entities"] = entities
-
-# Salvăm rezultatul într-un nou fișier JSON
-with open("../jsons/final/baza_date_final_with_entities.json", "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
-
-print("Entitățile au fost adăugate, duplicatele eliminate și fișierul a fost salvat ca 'baza_date_with_topics_with_entities.json'.")
+print(f"Entitățile au fost adăugate și fișierul a fost salvat ca '{OUTPUT_FILE}' (flat list of articles, strategy pattern).")

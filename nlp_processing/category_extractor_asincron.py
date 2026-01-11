@@ -21,8 +21,12 @@ cat_texts = list(CATEGORIES.values())
 print("🧮 Encoding categories...")
 cat_embeddings = model.encode(cat_texts, convert_to_tensor=True)
 
-INPUT_FILE = "../jsons/final/BAZA_DATE_FINALA.json" 
-OUTPUT_FILE = "output_classified.json"
+import os
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+INPUT_FILE = os.path.join(DATA_DIR, "baza_date_final.json")
+OUTPUT_FILE = os.path.join(DATA_DIR, "output_classified.json")
 
 # 2. Încărcare Date
 print(f"📂 Loading file: {INPUT_FILE}")

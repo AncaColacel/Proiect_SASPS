@@ -6,8 +6,12 @@ from transformers.pipelines.pt_utils import KeyDataset
 from tqdm.auto import tqdm
 
 # --- CONFIGURARE ---
-INPUT_FILE = "../jsons/final/baza_date_final_with_entities.json"
-OUTPUT_FILE = "../jsons/final/baza_date_final_sentiments_entities.json"
+import os
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+INPUT_FILE = os.path.join(DATA_DIR, "baza_date_final_with_entities.json")
+OUTPUT_FILE = os.path.join(DATA_DIR, "baza_date_final_sentiments_entities.json")
 MODEL_NAME = "readerbench/ro-sentiment"
 BATCH_SIZE = 32  # Pe GPU T4 din Colab poți încerca și 64 sau 128
 
@@ -41,13 +45,28 @@ def process_sentiment_optimized():
         print(f"❌ Nu am găsit fișierul: {INPUT_FILE}")
         return
 
-    # 2. APLANTIZARE LISTA (Flatten)
-    # Extragem toate articolele într-o singură listă liniară pentru a le procesa în batch
-    # Păstrăm o referință ca să putem scrie rezultatul înapoi în structura originală
+    # 2. DETECTARE ȘI FLATTEN ARTICOLE
+    # Acceptă atât listă plată de articole, cât și listă de surse cu "articles"
     all_articles_flat = []
-    for source in data:
-        all_articles_flat.extend(source.get("articles", []))
-    
+    if isinstance(data, list):
+        if data and isinstance(data[0], dict) and "content" in data[0]:
+            # Flat list of articles
+            all_articles_flat = data
+        elif data and isinstance(data[0], dict) and "articles" in data[0]:
+            # Nested: list of sources with "articles"
+            for source in data:
+                for article in source.get("articles", []):
+                    # Optionally preserve source info if available
+                    if "source" not in article and "source" in source:
+                        article["source"] = source["source"]
+                    all_articles_flat.append(article)
+        else:
+            print("❌ Structură de date necunoscută în input. Nicio acțiune efectuată.")
+            return
+    else:
+        print("❌ Inputul nu este o listă. Nicio acțiune efectuată.")
+        return
+
     total_articles = len(all_articles_flat)
     print(f"🚀 Pregătesc analiza pentru {total_articles} articole în batch-uri de {BATCH_SIZE}...")
 
@@ -77,25 +96,17 @@ def process_sentiment_optimized():
 
     # 6. MAPARE REZULTATE ÎNAPOI ÎN JSON
     print("💾 Salvez rezultatele...")
-    
     for i, article in enumerate(all_articles_flat):
-        # Rezultatul curent (ex: {'label': 'LABEL_1', 'score': 0.99})
         res = results[i]
-        
         raw_label = res['label']
         score = round(res['score'], 4)
-        
-        # Mapare etichete
         human_label = raw_label
         if raw_label == "LABEL_0": human_label = "negative"
         elif raw_label == "LABEL_1": human_label = "positive"
         elif raw_label == "LABEL_2": human_label = "neutral"
-        
-        # Dacă textul a fost "text gol" (din Dataset class), forțăm neutral
         if len(article.get("content", "")) < 20:
-             human_label = "neutral"
-             score = 0.0
-
+            human_label = "neutral"
+            score = 0.0
         article["sentiment"] = {
             "label": human_label,
             "raw_label": raw_label,
@@ -103,10 +114,9 @@ def process_sentiment_optimized():
             "model": MODEL_NAME
         }
 
-    # 7. SALVARE FINALĂ
+    # 7. SALVARE FINALĂ (mereu listă plată de articole)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    
+        json.dump(all_articles_flat, f, ensure_ascii=False, indent=2)
     print(f"\n🏁 Gata! Rezultatele sunt în '{OUTPUT_FILE}'.")
 
 if __name__ == "__main__":

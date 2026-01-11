@@ -13,17 +13,16 @@ from datetime import datetime
 from raport_generation import ReportEngine
 
 # 2. Importăm funcția SINCRONĂ din folderul nlp_processing
+import sys
+import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'nlp_processing'))
-try:
-    from nlp_processing.category_extractor_sincron import classify_on_demand 
-except ImportError:
-    print("⚠️ Nu am găsit 'category_extractor_sincron.py' în folderul nlp_processing.")
+from category_extractor_sincron import classify_on_demand
 
 app = Flask(__name__)
 CORS(app)
 
 # --- CONFIGURARE FIȘIERE ---
-FILE_ASINCRON = "jsons/final/BAZA_DATE_FINALA.json" 
+FILE_ASINCRON = "data/baza_date_final_nlp.json"  # Use final NLP output with topics, sentiments, entities
 FILE_TEMP_SINCRON = "temp_sincron_result.json"
 METRICS_FILE = "metrics_log.csv"
 
@@ -60,16 +59,17 @@ def endpoint_sincron():
     proc.cpu_percent(interval=None)
     start_time = time.time()
     
-    req_data = request.json
-    start_str = req_data.get('start_date')
-    end_str = req_data.get('end_date')
-    print(f"\n🐌 [START] Cerere Sincronă: {start_str} -> {end_str}")
-
     try:
+        # Extrage datele din request
+        req_data = request.json
+        start_str = req_data.get('start_date')
+        end_str = req_data.get('end_date')
         # STEP 1: Clasificare
+        if classify_on_demand is None:
+            print("❌ [ERROR] Funcția classify_on_demand nu este disponibilă!")
+            return jsonify({"error": "Funcția classify_on_demand nu a putut fi importată. Verifică nlp_processing/category_extractor_sincron.py."}), 500
         print("🔍 [DEBUG 1] Apelez classify_on_demand...")
         result_data = classify_on_demand(start_str, end_str)
-        
         # Verificăm ce am primit (FOARTE IMPORTANT)
         print(f"📦 [DEBUG 2] Tip date primite: {type(result_data)}")
         if isinstance(result_data, dict):
@@ -80,7 +80,7 @@ def endpoint_sincron():
         if "error" in result_data: 
             print(f"⚠️ [DEBUG 3] Primit eroare din classifier: {result_data['error']}")
             return jsonify(result_data), 400
-        
+
         count = result_data.get('count', 0)
         print(f"📊 [DEBUG 3] Count articole: {count}")
 
@@ -96,10 +96,10 @@ def endpoint_sincron():
             raise KeyError("Cheia 'articles' lipsește din result_data! Verifică category_extractor_sincron.py")
 
         print(f"💾 [DEBUG 4] Scriu în fișier temporar: {FILE_TEMP_SINCRON}")
-        temp_structure = {"source": "Sincron", "articles": result_data['articles']}
-        
+
+        # Write as a flat list for compatibility with new pipeline
         with open(FILE_TEMP_SINCRON, "w", encoding="utf-8") as f:
-            json.dump(temp_structure, f, ensure_ascii=False)
+            json.dump(result_data['articles'], f, ensure_ascii=False)
         print("✅ [DEBUG 4] Scriere reușită.")
 
         # STEP 3: Report Engine
@@ -130,6 +130,12 @@ def endpoint_sincron():
             "status": "success", "report": markdown_report, 
             "processing_time": duration, "articles_count": count, "type": "sincron"
         })
+        log_metrics("Sincron (V1)", duration, cpu_usage)
+
+        return jsonify({
+            "status": "success", "report": markdown_report, 
+            "processing_time": duration, "articles_count": count, "type": "sincron"
+        })
 
     except Exception as e:
         print("\n❌ ❌ ❌ EROARE CRITICĂ ÎN ENDPOINT ❌ ❌ ❌")
@@ -152,6 +158,7 @@ def endpoint_asincron():
     try:
         s_date = datetime.strptime(start_str, "%Y-%m-%d")
         e_date = datetime.strptime(end_str, "%Y-%m-%d")
+        print(f"s_date: {s_date}, e_date: {e_date}")
         engine = ReportEngine(s_date, e_date)
         
         if not os.path.exists(FILE_ASINCRON):

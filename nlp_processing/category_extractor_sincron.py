@@ -23,15 +23,11 @@ cat_embeddings = model.encode(cat_texts, convert_to_tensor=True)
 
 # --- 2. ÎNCĂRCARE DATE ROBUSTĂ ---
 # Aflăm calea folderului PROIECT (urcăm 2 nivele: din nlp_processing -> PROIECT)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Calea către fișierul JSON. 
-# ATENȚIE: Verifică dacă la tine e "BAZA_DATE_FINALA.json" sau "BAZA_DATE.json"
-INPUT_FILE = os.path.join(BASE_DIR, "jsons", "final", "BAZA_DATE_FINALA.json") 
-
-# Fallback: dacă nu găsește FINALA, caută varianta simplă
-if not os.path.exists(INPUT_FILE):
-    INPUT_FILE = os.path.join(BASE_DIR, "jsons", "final", "BAZA_DATE.json")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+INPUT_FILE = os.path.join(DATA_DIR, "baza_date_final.json")
 
 RAW_DATA = []
 if os.path.exists(INPUT_FILE):

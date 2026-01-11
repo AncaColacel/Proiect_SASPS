@@ -70,7 +70,7 @@ def process_article(url, title):
     except Exception:
         return None
 
-def collect_mediafax_smart(start_date: datetime, end_date: datetime):
+def collect_mediafax_smart(start_date: datetime, end_date: datetime, max_articles=50):
     all_articles = []
     page = 500
     keep_going = True
@@ -132,6 +132,9 @@ def collect_mediafax_smart(start_date: datetime, end_date: datetime):
             # 🎲 1. SAMPLING: Luăm doar 1 din N articole
             if idx % SAMPLE_RATE != 0:
                 continue
+            if len(all_articles) >= max_articles:
+                keep_going = False
+                break
 
             url, title = get_meta(div)
             if not url: continue

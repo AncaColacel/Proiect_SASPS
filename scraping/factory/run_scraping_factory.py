@@ -1,9 +1,9 @@
 # scraping/factory/run_scraping_factory.py
-from .factory import ScraperFactory
+from scraping.factory.factory import ScraperFactory
 
 
 def main():
-    sources = ["hotnews", "digi24", "mediafax", "antena1"]
+    sources = ["hotnews", "mediafax", "antena1"]
 
     print("🚀 Pornește scraping-ul folosind Factory Pattern...\n")
 

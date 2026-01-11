@@ -25,9 +25,15 @@ class Topic:
         return "Alte Surse"
 
     def _extract_entities(self, article):
-        ents = article.get("entities", {})
+        ents = article.get("entities", [])
         all_e = []
-        if isinstance(ents, dict):
+        # New schema: entities is a list of dicts with 'text' and 'type'
+        if isinstance(ents, list):
+            for ent in ents:
+                if isinstance(ent, dict) and 'text' in ent:
+                    all_e.append(ent['text'])
+        # Legacy schema: entities is a dict of lists
+        elif isinstance(ents, dict):
             for k in ["PER", "PERSON", "ORG", "GPE", "LOC"]:
                 all_e.extend(ents.get(k, []))
         return set(all_e)
@@ -52,6 +58,48 @@ class ReportEngine:
         self.end_date = end_date
         self.topics_by_category = {} 
         self.stats = {"total": 0}
+    
+    def _classify_category(self, article):
+        """Classify article into category based on keywords in title and content"""
+        text = (article.get("title", "") + " " + article.get("content", "")).lower()
+        
+        # Political keywords
+        if any(kw in text for kw in ["alegeri", "parlament", "guvern", "ministru", "preşedinte", "președinte", 
+                                       "politic", "vot", "candidat", "partid", "psd", "pnl", "usr", "aur",
+                                       "simion", "ciolacu", "antonescu", "lasconi"]):
+            return "POLITIC"
+        
+        # International/External keywords
+        if any(kw in text for kw in ["trump", "sua", "china", "rusia", "europa", "nato", "biden",
+                                       "extern", "internațional", "război", "ucraina", "gaza", "israel"]):
+            return "EXTERNE"
+        
+        # Economic keywords
+        if any(kw in text for kw in ["economi", "afaceri", "companie", "investiți", "bursă", "bnr",
+                                       "euro", "dolar", "inflație", "pib", "tarif", "comerț", "comercial"]):
+            return "ECONOMIC"
+        
+        # Justice keywords
+        if any(kw in text for kw in ["justiție", "procuror", "judecător", "instanță", "dna", "diicot",
+                                       "anchetă", "condamnat", "dosar", "penal"]):
+            return "JUSTIȚIE"
+        
+        # Sports keywords
+        if any(kw in text for kw in ["sport", "fotbal", "fcsb", "rapid", "dinamo", "steaua", "champions",
+                                       "liga", "jucător", "antrenor", "meci", "campionat"]):
+            return "SPORT"
+        
+        # IT/Tech keywords
+        if any(kw in text for kw in ["tehnolog", "software", "it", "calculator", "internet", "cyber",
+                                       "aplicație", "platformă", "google", "facebook", "microsoft"]):
+            return "IT"
+        
+        # Social keywords
+        if any(kw in text for kw in ["social", "sănătate", "educație", "pensie", "salariu", "elev",
+                                       "profesor", "spital", "medic", "pacient"]):
+            return "SOCIAL"
+        
+        return "DIVERSE"
 
     def load_data(self, source_input):
         raw_list = []
@@ -62,11 +110,20 @@ class ReportEngine:
             try:
                 with open(source_input, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    if isinstance(data, dict): 
-                        raw_list = data.get("articles", [])
-                    else:
-                        for src in data: raw_list.extend(src.get("articles", []))
-            except: return
+                    if isinstance(data, list):
+                        # Flat list of articles
+                        raw_list = data
+                    elif isinstance(data, dict) and "articles" in data:
+                        # Dict with articles key
+                        raw_list = data["articles"]
+                    elif isinstance(data, dict):
+                        # Dict of sources, flatten
+                        for src in data.values():
+                            if isinstance(src, list):
+                                raw_list.extend(src)
+            except Exception as e:
+                print(f"[ERROR] Failed to load file: {e}")
+                return
         elif isinstance(source_input, list):
             raw_list = source_input
 
@@ -75,36 +132,52 @@ class ReportEngine:
         seen_urls = set()
         
         # Mapare rapidă pentru V2 (Clustering pre-calculat)
-        cluster_map = {} 
+        cluster_map = {}
 
         for art in raw_list:
-            if art.get('url') in seen_urls: continue
+            if not isinstance(art, dict) or not art:
+                continue
+            if art.get('url') in seen_urls:
+                continue
             
             try:
                 d_str = art.get("date", "").split("T")[0]
                 d = datetime.strptime(d_str, "%Y-%m-%d")
-                if not (self.start_date <= d <= self.end_date): continue
-            except: continue
+                if not (self.start_date <= d <= self.end_date):
+                    continue
+            except:
+                continue
 
             seen_urls.add(art.get('url'))
             
-            # Categorie
-            cat = art.get("auto_category") or art.get("category") or "DIVERSE"
+            # Categorie: try old schema first, then keyword-based classification
+            cat = art.get("auto_category") or art.get("category")
+            if not cat or cat == "DIVERSE":
+                cat = self._classify_category(art)
+            
             if cat not in self.topics_by_category:
                 self.topics_by_category[cat] = []
 
             # --- LOGICA HIBRIDĂ ---
             
-            # CAZ A: Avem Cluster ID (V2 - Asincron)
-            if "cluster_id" in art:
-                cid = art["cluster_id"]
-                if cid == -1: continue # Ignorăm zgomotul
+            # CAZ A: Avem Cluster/Topic ID (V2 - Asincron)
+            # Try new schema (topic.id) first, then fallback to old schema (cluster_id)
+            topic_id = None
+            topic_info = art.get("topic", {})
+            if isinstance(topic_info, dict) and "id" in topic_info:
+                topic_id = topic_info["id"]
+            elif "cluster_id" in art:
+                topic_id = art["cluster_id"]
+            
+            if topic_id is not None:
+                if topic_id == -1:
+                    continue  # Ignorăm zgomotul
 
-                if cid in cluster_map:
-                    cluster_map[cid].add_article(art)
+                if topic_id in cluster_map:
+                    cluster_map[topic_id].add_article(art)
                 else:
                     new_topic = Topic(art)
-                    cluster_map[cid] = new_topic
+                    cluster_map[topic_id] = new_topic
                     self.topics_by_category[cat].append(new_topic)
             
             # CAZ B: Nu avem ID (V1 - Sincron) - Facem difflib

@@ -6,9 +6,13 @@ from sklearn.decomposition import LatentDirichletAllocation
 
 # --- CONFIGURARE ---
 # Fișierul care ARE deja sentimente și entități
-INPUT_FILE = "../jsons/final/baza_date_final_sentiments_entities.json" 
+import os
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+INPUT_FILE = os.path.join(DATA_DIR, "baza_date_final_sentiments_entities.json")
 # Același fișier (sau unul nou) în care salvăm și topicurile
-OUTPUT_FILE = "../jsons/final/baza_date_final_nlp.json"
+OUTPUT_FILE = os.path.join(DATA_DIR, "baza_date_final_nlp.json")
 
 # Stop words (cuvinte de legătură care nu ne interesează la topicuri)
 ROMANIAN_STOP_WORDS = [
@@ -44,18 +48,33 @@ def add_topics():
         return
 
     # --- ETAPA 1: COLECTARE TEXTE ---
-    # Avem nevoie de toate textele deodată pentru a antrena modelul LDA
+    # Acceptă atât listă plată de articole, cât și listă de surse cu "articles"
     all_docs = []
-    articles_ref = [] # Păstrăm referința la obiectul articol ca să-l modificăm direct
+    articles_ref = []
 
     print("📝 Pregătesc textele pentru analiză...")
-    for source in data:
-        for article in source.get("articles", []):
-            content = article.get("content", "")
-            # Luăm în calcul doar articolele care au text consistent
-            if content and len(content) > 50:
-                all_docs.append(preprocess_text(content))
-                articles_ref.append(article)
+    if isinstance(data, list):
+        if data and isinstance(data[0], dict) and "content" in data[0]:
+            # Flat list of articles
+            for article in data:
+                content = article.get("content", "")
+                if content and len(content) > 50:
+                    all_docs.append(preprocess_text(content))
+                    articles_ref.append(article)
+        elif data and isinstance(data[0], dict) and "articles" in data[0]:
+            # Nested: list of sources with "articles"
+            for source in data:
+                for article in source.get("articles", []):
+                    content = article.get("content", "")
+                    if content and len(content) > 50:
+                        all_docs.append(preprocess_text(content))
+                        articles_ref.append(article)
+        else:
+            print("⚠️ Structură de date necunoscută în input. Nicio acțiune efectuată.")
+            return
+    else:
+        print("⚠️ Inputul nu este o listă. Nicio acțiune efectuată.")
+        return
 
     if not all_docs:
         print("⚠️ Nu am găsit articole cu text valid.")

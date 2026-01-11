@@ -80,7 +80,7 @@ def process_article(url, title):
     except Exception:
         return None
 
-def collect_hotnews_smart(start_date: datetime, end_date: datetime):
+def collect_hotnews_smart(start_date: datetime, end_date: datetime, max_articles=50):
     all_articles = []
     page = 500
     keep_going = True
@@ -150,6 +150,9 @@ def collect_hotnews_smart(start_date: datetime, end_date: datetime):
         consecutive_old_counter = 0 
 
         for idx, art in enumerate(article_items):
+            if len(all_articles) >= max_articles:
+                keep_going = False
+                break
             # Sampling
             if idx % SAMPLE_RATE != 0: continue
 

@@ -86,7 +86,7 @@ def process_article(url, title):
     except Exception:
         return None
 
-def collect_digi24_smart(start_date: datetime, end_date: datetime):
+def collect_digi24_smart(start_date: datetime, end_date: datetime, max_articles=50, max_pages=5):
     all_articles = []
     page = 1
     keep_going = True
@@ -100,7 +100,7 @@ def collect_digi24_smart(start_date: datetime, end_date: datetime):
 
     print(f"🚀 START Scraping DIGI24: {start_date.date()} -> {end_date.date()}")
 
-    while keep_going:
+    while keep_going and page <= max_pages:
         html = fetch_listing_page(page)
         if not html: break
 
@@ -141,6 +141,9 @@ def collect_digi24_smart(start_date: datetime, end_date: datetime):
 
         saved_count = 0
         for idx, art in enumerate(article_items):
+            if len(all_articles) >= max_articles:
+                keep_going = False
+                break
             if idx % SAMPLE_RATE != 0: continue # Sampling
 
             url, title = get_meta(art)
@@ -172,7 +175,7 @@ def collect_digi24_smart(start_date: datetime, end_date: datetime):
         
         print(f"--- Pagina {page} gata. Salvate: {saved_count}")
         page += 1
-        if page > 500: break
+    # Remove old hardcoded page limit
 
     return all_articles
 
