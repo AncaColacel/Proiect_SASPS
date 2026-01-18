@@ -34,3 +34,5 @@ Timestamp,Mode,Latency_Sec,CPU_Percent,Memory_MB
 00:54:31,Asincron (V2),0.0179,60.1,866.6
 00:54:53,Asincron (V2),0.0107,91.1,864.0
 00:56:57,Asincron (V2),0.0112,87.7,861.9
+23:19:11,Asincron (V2),0.0087,94.8,863.4
+23:19:23,Asincron (V2),0.0183,88.5,866.1

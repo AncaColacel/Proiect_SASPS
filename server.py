@@ -10,7 +10,7 @@ import traceback
 from datetime import datetime
 
 # --- IMPORTURI DIN PROIECT ---
-from raport_generation import ReportEngine
+from raport_generation import ReportBuilder
 
 # 2. Importăm funcția SINCRONĂ din folderul nlp_processing
 import sys
@@ -106,10 +106,12 @@ def endpoint_sincron():
         print("⚙️ [DEBUG 5] Inițializez ReportEngine...")
         s_date = datetime.strptime(start_str, "%Y-%m-%d")
         e_date = datetime.strptime(end_str, "%Y-%m-%d")
-        engine = ReportEngine(s_date, e_date)
         
         print(f"📂 [DEBUG 6] Încarc date în Engine din: {FILE_TEMP_SINCRON}")
-        engine.load_data(FILE_TEMP_SINCRON)
+        engine = (ReportBuilder()
+            .set_date_range(s_date, e_date)
+            .load_from_file(FILE_TEMP_SINCRON)
+            .build())
         
         # Verificăm dacă engine-ul a încărcat ceva
         print(f"📈 [DEBUG 7] Stats Engine după încărcare: {engine.stats}")
@@ -159,12 +161,14 @@ def endpoint_asincron():
         s_date = datetime.strptime(start_str, "%Y-%m-%d")
         e_date = datetime.strptime(end_str, "%Y-%m-%d")
         print(f"s_date: {s_date}, e_date: {e_date}")
-        engine = ReportEngine(s_date, e_date)
         
         if not os.path.exists(FILE_ASINCRON):
             return jsonify({"error": "Lipsă fișier procesat"}), 500
-            
-        engine.load_data(FILE_ASINCRON)
+        
+        engine = (ReportBuilder()
+            .set_date_range(s_date, e_date)
+            .load_from_file(FILE_ASINCRON)
+            .build())
         markdown_report = engine.generate_curated_markdown()
 
         duration = time.time() - start_time

@@ -52,10 +52,58 @@ class Topic:
         score_info = len(self.entities) * 1
         self.score = score_volume + score_diversity + score_info
 
+class ReportBuilder:
+    """Builder for configuring and creating ReportEngine instances."""
+    def __init__(self):
+        self._start_date = None
+        self._end_date = None
+        self._data_source = None
+        self._top_stories = 5
+        self._include_categories = None
+        
+    def set_date_range(self, start_date, end_date):
+        """Set the date range for the report."""
+        self._start_date = start_date
+        self._end_date = end_date
+        return self
+        
+    def load_from_file(self, filepath):
+        """Load data from a JSON file."""
+        self._data_source = filepath
+        return self
+        
+    def load_from_list(self, articles):
+        """Load data from an in-memory list."""
+        self._data_source = articles
+        return self
+        
+    def with_top_stories(self, count):
+        """Set the number of top stories per category."""
+        self._top_stories = count
+        return self
+        
+    def include_categories(self, categories):
+        """Filter to only include specific categories."""
+        self._include_categories = categories
+        return self
+        
+    def build(self):
+        """Build and return the configured ReportEngine."""
+        if not self._start_date or not self._end_date:
+            raise ValueError("Date range must be set using set_date_range()")
+        if not self._data_source:
+            raise ValueError("Data source must be set using load_from_file() or load_from_list()")
+            
+        engine = ReportEngine(self._start_date, self._end_date, self._top_stories, self._include_categories)
+        engine.load_data(self._data_source)
+        return engine
+
 class ReportEngine:
-    def __init__(self, start_date, end_date):
+    def __init__(self, start_date, end_date, top_stories=5, include_categories=None):
         self.start_date = start_date
         self.end_date = end_date
+        self.top_stories = top_stories
+        self.include_categories = include_categories
         self.topics_by_category = {} 
         self.stats = {"total": 0}
     
@@ -209,6 +257,10 @@ class ReportEngine:
             priority_cats = ["POLITIC", "ECONOMIC", "EXTERNE", "JUSTIȚIE", "SOCIAL", "SPORT", "IT"]
             sorted_keys = sorted(self.topics_by_category.keys(), 
                                 key=lambda k: next((i for i, p in enumerate(priority_cats) if p in k.upper()), 99))
+            
+            # Filter categories if specified
+            if self.include_categories:
+                sorted_keys = [k for k in sorted_keys if k in self.include_categories]
 
             for cat in sorted_keys:
                 topics = self.topics_by_category[cat]
@@ -218,7 +270,7 @@ class ReportEngine:
                 for t in topics: t.calculate_importance()
                 topics.sort(key=lambda t: t.score, reverse=True)
                 
-                top_topics = topics[:TOP_STORIES_PER_CATEGORY]
+                top_topics = topics[:self.top_stories]
                 
                 if top_topics[0].score < 10: continue 
 
@@ -281,13 +333,18 @@ class ReportEngine:
         print(f"Raport salvat: {os.path.abspath(filename)}")
 
 if __name__ == "__main__":
-    # Test local
+    # Test local with Builder pattern
     s = datetime(2025, 10, 1)
     e = datetime(2025, 10, 6)
     start_str = s.strftime("%Y-%m-%d")
     end_str = e.strftime("%Y-%m-%d")
     dynamic_filename = f"Raport_Sinteza_{start_str}_{end_str}.md"
     
-    engine = ReportEngine(s, e)
-    engine.load_data(INPUT_FILE)
+    # Using Builder pattern for flexible configuration
+    engine = (ReportBuilder()
+        .set_date_range(s, e)
+        .load_from_file(INPUT_FILE)
+        .with_top_stories(5)
+        .build())
+    
     engine.save(dynamic_filename)
